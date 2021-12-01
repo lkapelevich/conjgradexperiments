@@ -214,29 +214,35 @@ end
 function naive_dual_grad(cone, z)
     curr = init_guess(cone)
     derivs = grad_hess(cone, curr)
+    quad_bound = 0.35
     (g, H) = (DiffResults.gradient(derivs), DiffResults.hessian(derivs))
     r = z + g
     Hir = H \ r
     # (r, Hir) = grad_invhess(cone, curr, z)
-    n = sqrt(dot(r, Hir))
+    n = n_prev = sqrt(dot(r, Hir))
 
     max_iter = 400
     iter = 1
     resid_path = []
 
     while n > 1000eps()
-        push!(resid_path, dot(z, -curr) + cone_d + 1)
-        α = (n > 0.35 ? inv(1 + n) : 1)
+        α = (n > quad_bound ? inv(1 + n) : 1)
         curr -= Hir * α
+        push!(resid_path, dot(z, -curr) + length(z))
         derivs = grad_hess(cone, curr)
         (g, H) = (DiffResults.gradient(derivs), DiffResults.hessian(derivs))
-        r = z + g    
+        r = z + g
         Hir = H \ r
         # (r, Hir) = grad_invhess(cone, curr, z)
         n2 = dot(r, Hir)
-        n2 < 0 && break # TODO check magnitude
+        n2 < 0 && break # TODO couple crazy hypogeom cases
         n = sqrt(n2)
         iter += 1
+        # slow progress (numerical)
+        if (n_prev < quad_bound) && (n > 1000(n_prev / (1 - n_prev))^2)
+            break
+        end
+        n_prev = n
         (iter == max_iter) && break
     end
     return (-curr, iter, resid_path)
@@ -277,7 +283,7 @@ function get_resids()
         if i == 1
             resid_df = DataFrame(resid = resid_path)
             resids_name = lowercase(string(nameof(C))) * string(Int(-log10(o)))
-            CSV.write(resids_name * ".csv", resid_df)
+            CSV.write(joinpath("csvs", resids_name * ".csv"), resid_df)
         end
     end
 
@@ -288,7 +294,7 @@ function get_resids()
         :directiters => mean => :directitersmean,
         )
 
-    CSV.write("cgs.csv", agg)
+    CSV.write("csvs/cgs.csv", agg)
     return
 end
 
