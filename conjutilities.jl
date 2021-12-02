@@ -29,21 +29,17 @@ function omegawright(z::T) where T
 end
 
 function rootnewton(
-    lower::T,
-    upper::T,
     f::Function,
-    g::Function,
-    init = (lower + upper) / 2,
+    g::Function;
+    lower::T = -Inf,
+    upper::T = Inf,
+    init::T = (lower + upper) / 2,
+    increasing::Bool = true,
     ) where {T <: Real}
     curr = init
     f_new = f(BigFloat(curr))
     iter = 0
-    while abs(f_new) > 1000eps(T)
-        if f_new < 0
-            lower = curr
-        else
-            upper = curr
-        end
+    while abs(f_new) > 1000eps()
         candidate = curr - f_new / g(BigFloat(curr))
         if (candidate < lower) || (candidate > upper)
             curr = (lower + upper) / 2
@@ -51,6 +47,19 @@ function rootnewton(
             curr = candidate
         end
         f_new = f(BigFloat(curr))
+        if f_new < 0
+            if increasing
+                lower = curr
+            else
+                upper = curr
+            end
+        else
+            if increasing
+                upper = curr
+            else
+                lower = curr
+            end
+        end
         iter += 1
         if iter > 200
             @warn "too many iters in dual grad"

@@ -139,9 +139,9 @@ function dual_grad(cone::HypoPower, pr)
 
     f(y) = sum(ai * log(y - p * ai) for ai in α) - sumlog
     fp(y) = sum(ai / (y - p * ai) for ai in α)
-    lower_bound = 0.0
-    upper_bound = exp(sumlog) + p / cone_d
-    (new_bound, iter) = rootnewton(lower_bound, upper_bound, f, fp)
+    lower = 0.0
+    upper = exp(sumlog) + p / cone_d
+    (new_bound, iter) = rootnewton(f, fp, lower = lower, upper = upper)
 
     dual_g_ϕ = inv(new_bound)
     cgp = -inv(p) - dual_g_ϕ
@@ -173,7 +173,8 @@ function dual_grad(cone::RadialPower, pr)
             log_phi_r - log(2 * y / p + y^2) - 2 * log(2 * y / p)
         fp(y) = 2 * sum(αi^2 / (αi * y + (1 + αi) / p) for αi in α) -
             2 * (y + 1 / p) / y / (y + 2 / p)
-        (cgp, iter) = rootnewton(outer_bound, inner_bound, f, fp, outer_bound)
+        # TODO decide which bound to use
+        (cgp, iter) = rootnewton(f, fp, init = inner_bound, increasing = false)
         cgr = -(α * (1 + p * cgp) .+ 1) ./ r
     end
     return (vcat(cgp, cgr), iter)
@@ -198,7 +199,7 @@ function dual_grad(cone::InfinityNorm, pr)
     hp(y) = p + sum(abs2(ri) * y * (1 + abs2(ri) * y^2)^(-1/2) for ri in r)
     lower = -(cone_d + 1) / dual_zeta
     upper = min(-inv(dual_zeta), -(cone_d + 1) / p)
-    (cgp, iter) = rootnewton(lower, upper, h, hp)
+    (cgp, iter) = rootnewton(h, hp, init = upper)
 
     cgr = copy(r)
     for i in eachindex(r)
