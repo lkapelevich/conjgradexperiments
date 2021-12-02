@@ -4,7 +4,8 @@
 # Series approximations can be found in the book chapter ``The Wright ω Function''
 # by Corless, R. M. and Jeffrey, D. J.
 
-# initial series approximations should be modified for types other than Float64 (implemented elsewhere)
+# initial series approximations should be modified for types other than Float64
+# (implemented elsewhere) and need more terms
 
 function omegawright(z::T) where T
     z = float(z)
@@ -20,7 +21,8 @@ function omegawright(z::T) where T
         w = z + lz * (-1 + (1 + (lz / 2 - 1 + (lz * (lz / 3 - T(3) / 2) + 1) / z) / z) / z)
     end
     r = z - w - log(w)
-    for k in 1:2
+    # refinement steps
+    for _ in 1:2
         t = (1 + w) * (1 + w + 2 / 3 * r)
         w = w * (1 + r / (1 + w) * (t - r / 2) / (t - r))
         r = (2 * w * (w - 4) - 1) / 72 / (1 + w)^6 * r^4
@@ -37,7 +39,7 @@ function rootnewton(
     increasing::Bool = true,
     ) where {T <: Real}
     curr = init
-    f_new = f(BigFloat(curr))
+    f_new = f(curr)
     iter = 0
     while abs(f_new) > 1000eps()
         candidate = curr - f_new / g(BigFloat(curr))
@@ -46,19 +48,11 @@ function rootnewton(
         else
             curr = candidate
         end
-        f_new = f(BigFloat(curr))
-        if f_new < 0
-            if increasing
-                lower = curr
-            else
-                upper = curr
-            end
+        f_new = f(curr)
+        if (f_new < 0 && increasing) || (f_new >= 0 && !increasing)
+            lower = curr
         else
-            if increasing
-                upper = curr
-            else
-                lower = curr
-            end
+            upper = curr
         end
         iter += 1
         if iter > 200

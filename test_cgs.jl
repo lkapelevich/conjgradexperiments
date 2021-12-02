@@ -137,11 +137,11 @@ function dual_grad(cone::HypoPower, pr)
     α = cone.α
     sumlog = sum(α_i * log(r_i) for (α_i, r_i) in zip(α, r))
 
-    f(y) = sum(ai * log(y - p * ai) for ai in α) - sumlog
-    fp(y) = sum(ai / (y - p * ai) for ai in α)
+    h(y) = sum(ai * log(y - p * ai) for αi in α) - sumlog
+    hp(y) = sum(ai / (y - p * ai) for αi in α)
     lower = 0.0
     upper = exp(sumlog) + p / cone_d
-    (new_bound, iter) = rootnewton(f, fp, lower = lower, upper = upper)
+    (new_bound, iter) = rootnewton(h, hp, lower = lower, upper = upper)
 
     dual_g_ϕ = inv(new_bound)
     cgp = -inv(p) - dual_g_ϕ
@@ -159,7 +159,7 @@ function dual_grad(cone::RadialPower, pr)
     (p, r) = (pr[1], pr[2:end])
     α = cone.α
     if iszero(p)
-        ctp = 0
+        cgp = 0
         cgr = -(α .+ 1) ./ r
     else
         log_phi_r = 2 * sum(αi * log(ri) for (αi, ri) in zip(α, r))
@@ -169,12 +169,12 @@ function dual_grad(cone::RadialPower, pr)
             p^2 * phi_r + cone_d^2 - 1))) / (p / cone_d - cone_d * phi_r / p)
         gamma = abs(p) / phi_αr
         outer_bound = (1 + cone_d) * gamma / (1 - gamma) / p
-        f(y) = 2 * sum(αi * log(2 * αi * y^2 + (1 + αi) * 2 * y / p) for αi in α) -
+        h(y) = 2 * sum(αi * log(2 * αi * y^2 + (1 + αi) * 2 * y / p) for αi in α) -
             log_phi_r - log(2 * y / p + y^2) - 2 * log(2 * y / p)
-        fp(y) = 2 * sum(αi^2 / (αi * y + (1 + αi) / p) for αi in α) -
+        hp(y) = 2 * sum(αi^2 / (αi * y + (1 + αi) / p) for αi in α) -
             2 * (y + 1 / p) / y / (y + 2 / p)
-        # TODO decide which bound to use
-        (cgp, iter) = rootnewton(f, fp, init = inner_bound, increasing = false)
+        (cgp, iter) = rootnewton(h, hp, lower = inner_bound, upper = outer_bound,
+            init = inner_bound, increasing = false)
         cgr = -(α * (1 + p * cgp) .+ 1) ./ r
     end
     return (vcat(cgp, cgr), iter)
@@ -195,9 +195,9 @@ end
 function dual_grad(cone::InfinityNorm, pr)
     (p, r) = (pr[1], pr[2:end])
     dual_zeta = p - sum(abs, r)
-    h(y) = p * y + sum(sqrt(1 + abs2(ri) * y^2) for ri in r) + 1
-    hp(y) = p + sum(abs2(ri) * y * (1 + abs2(ri) * y^2)^(-1/2) for ri in r)
-    lower = -(cone_d + 1) / dual_zeta
+    h(y) = p * y + sum(sqrt(1 + abs2(ri * y)) for ri in r) + 1
+    hp(y) = p + y * sum(abs2(ri) / sqrt(1 + abs2(ri * y)) for ri in r)
+    # lower = -(cone_d + 1) / dual_zeta
     upper = min(-inv(dual_zeta), -(cone_d + 1) / p)
     (cgp, iter) = rootnewton(h, hp, init = upper)
 
@@ -206,7 +206,7 @@ function dual_grad(cone::InfinityNorm, pr)
         if abs(r[i]) .< 100eps()
             cgr[i] = cgp^2 * r[i] / 2
         else
-            cgr[i] = (-1 + sqrt(1 + abs2(r[i]) * cgp^2)) / r[i]
+            cgr[i] = (-1 + sqrt(1 + abs2(r[i] * cgp))) / r[i]
         end
     end
     return (vcat(cgp, cgr), iter)
