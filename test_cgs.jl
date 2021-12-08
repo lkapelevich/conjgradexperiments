@@ -5,11 +5,12 @@ using LinearAlgebra
 using DataFrames
 using CSV
 using Statistics
+using Printf
 include("conjutilities.jl")
 # include("grad_hess.jl")
 Random.seed!(1)
-num_samples = 1
-cone_ds = [5, 25, 50]
+num_samples = 10
+cone_ds = [20, 40, 60]
 offsets = 10.0 .^ collect(-5:-1)
 
 ##
@@ -234,11 +235,14 @@ function naive_dual_grad(cone, z)
     derivs = grad_hess(cone, curr)
     quad_bound = 0.35
     (g, H) = (DiffResults.gradient(derivs), DiffResults.hessian(derivs))
+    H_fact = cholesky(Symmetric(H))
     r = z + g
-    Hir = H \ r
-    # (r, Hir) = grad_invhess(cone, curr, z)
+    Hir = H_fact \ r
     n = n_prev = sqrt(dot(r, Hir))
-
+    #
+    # Hiz = H_fact \ z
+    # Hir = Hiz - curr
+    # n = n_prev = sqrt(length(z) - 2 * dot(curr, z) + dot(z, Hiz))
     max_iter = 400
     iter = 1
     resid_path = []
@@ -249,12 +253,18 @@ function naive_dual_grad(cone, z)
         push!(resid_path, dot(z, -curr) + length(z))
         derivs = grad_hess(cone, curr)
         (g, H) = (DiffResults.gradient(derivs), DiffResults.hessian(derivs))
+        H_fact = cholesky(Symmetric(H), check = false)
+        if !issuccess(H_fact)
+            H_fact = bunchkaufman(Symmetric(H))
+        end
         r = z + g
-        Hir = H \ r
-        # (r, Hir) = grad_invhess(cone, curr, z)
+        Hir = H_fact \ r
         n2 = dot(r, Hir)
-        n2 < 0 && break # TODO couple crazy hypogeom cases
-        n = sqrt(n2)
+        # Hiz = H_fact \ z
+        # Hir = Hiz - curr
+        # n2 = length(z) - 2 * dot(curr, z) + dot(z, Hiz)
+        n2 < -sqrt(eps()) && break # couple crazy hypogeom cases
+        n = sqrt(abs(n2))
         iter += 1
         # slow progress (numerical)
         if (n_prev < quad_bound) && (n > 1000(n_prev / (1 - n_prev))^2)
@@ -276,7 +286,18 @@ cone_ts = [
     InfinityNorm
     ]
 
+function printx(x::Float64)
+    if x < 10
+        return @sprintf("%.1f", x)
+    else
+        return @sprintf("%.0f.", x)
+    end
+end
+
 function get_resids()
+    reio = open("tex/resid.tex", "w")
+    itio = open("tex/iters.tex", "w")
+    sep = " & "
     for d in cone_ds
         results = DataFrame(
             cone_d = Int[],
@@ -296,7 +317,7 @@ function get_resids()
             resid = dot(z, g) + length(z)
             # @show resid
             (naive_g, naive_iter, resid_path) = naive_dual_grad(cone, z)
-            naive_resid = dot(z, naive_g) + length(z)
+            naive_resid = abs(dot(z, naive_g) + length(z))
             push!(results, (d, nameof(C), o, i, resid,
                 naive_resid, naive_iter, iter))
             if i == 1
@@ -313,8 +334,25 @@ function get_resids()
             :directiters => mean => :directitersmean,
             )
 
+        for subdf in groupby(agg, [:cone_d, :offset])
+            for r in eachrow(subdf)
+                print(reio, sep * printx(log10(abs(r.residdirectmean))) * sep *
+                    printx(log10(abs(r.residnaivemean))))
+            end
+            print(reio, "\\\\ \n")
+        end
+        for subdf in groupby(agg, [:cone_d, :offset])
+            for r in eachrow(subdf)
+                print(itio, sep * sep * printx(r.newtonitersmean) *
+                    sep * printx(r.directitersmean))
+            end
+            print(itio, "\\\\ \n")
+        end
+
         CSV.write("csvs/cgs_$(d).csv", agg)
     end
+    close(reio)
+    close(itio)
     return
 end
 
