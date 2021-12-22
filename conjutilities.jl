@@ -4,28 +4,30 @@
 # Series approximations can be found in the book chapter ``The Wright ω Function''
 # by Corless, R. M. and Jeffrey, D. J.
 
-# initial series approximations should be modified for types other than Float64
-# (implemented elsewhere) and need more terms
-
-function omegawright(z::T) where T
+function wrightomega(z::T) where {T <: Real}
     z = float(z)
     if z < -2
         t = exp(z)
         w = t * (1 + t * (-1 + t * (T(3) / 2 + t * (-T(8) / 3 + T(125) / 24 * t))))
-    elseif z < 1 + π
+    elseif z < T(1) + π
         z1 = z - 1
         w = 1 + z1 / 2 * (1 + z1 / 8 * (1 + z1 / 12 * (-1 + z1 / 16 *
             (-1 + z1 * T(13) / 20))))
     else
         lz = log(z)
-        w = z + lz * (-1 + (1 + (lz / 2 - 1 + (lz * (lz / 3 - T(3) / 2) + 1) / z) / z) / z)
+        w = z + lz * (-1 + (1 + (lz / 2 - 1 + (lz * (lz / 3 - T(3) / 2) + 1) /
+            z) / z) / z)
     end
-    r = z - w - log(w)
     # refinement steps
-    for _ in 1:2
-        t = (1 + w) * (1 + w + 2 / 3 * r)
-        w = w * (1 + r / (1 + w) * (t - r / 2) / (t - r))
-        r = (2 * w * (w - 4) - 1) / 72 / (1 + w)^6 * r^4
+    for _ in 1:5
+        r = z - w - log(w)
+        w1 = w + 1
+        t = w1 * (w1 + T(2) / 3 * r)
+        w *= 1 + r / w1 * (t - r / 2) / (t - r)
+        fscn = abs(r^4 * (2 * w * (w - 4) - 1))
+        if t < eps(float(T)) * 72 * w1^6
+            break
+        end
     end
     return w::float(T)
 end

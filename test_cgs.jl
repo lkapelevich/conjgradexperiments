@@ -137,7 +137,7 @@ function dual_grad(cone::SumLog, pqr)
     (p, q, r) = (pqr[1], pqr[2], pqr[3:end])
     dual_ϕ = sum(log(r_i / -p) for r_i in r)
     β = 1 + d - q / p + dual_ϕ
-    bomega = d * omegawright(β / d - log(d))
+    bomega = d * wrightomega(β / d - log(d))
     @assert bomega + d * log(bomega) ≈ β
 
     cgp = (-d - 2 + q / p + 2 * bomega) / (p * (1 - bomega))
@@ -166,8 +166,9 @@ function dual_grad(cone::HypoGeom, pr)
     d = cone.d
     (p, r) = (pr[1], pr[2:end])
     dual_ϕ = exp(sum(log, r) / d)
-    cgp = -inv(p) - d / (d * dual_ϕ + p)
-    cgr = -1 / (1 + p / d / dual_ϕ) ./ r
+    dual_ζ = dual_ϕ + p / d
+    cgp = -inv(p) - inv(dual_ζ)
+    cgr = -dual_ϕ / dual_ζ ./ r
     return (vcat(cgp, cgr), 0)
 end
 function dual_grad(cone::RadialPower, pr)
