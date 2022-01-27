@@ -155,7 +155,8 @@ function dual_grad(cone::HypoPower, pr)
     hp(y) = sum(αi / (y - p * αi) for αi in α)
     lower = 0.0
     upper = exp(sumlog) + p / d
-    (new_bound, iter) = rootnewton(h, hp, lower = lower, upper = upper)
+    # (new_bound, iter) = rootnewton(h, hp, lower = lower, upper = upper)
+    (new_bound, iter) = rootnewton(h, hp, init = 0.0, increasing = true)
 
     dual_g_ϕ = inv(new_bound)
     cgp = -inv(p) - dual_g_ϕ
@@ -222,8 +223,8 @@ function dual_grad(cone::InfinityNorm, pr)
 
     cgr = copy(r)
     for i in eachindex(r)
-        if abs(r[i]) .< 100eps()
-            cgr[i] = cgp^2 * r[i] / 2
+        if abs(r[i]) .< eps()
+            cgr[i] = 0
         else
             cgr[i] = (-1 + sqrt(1 + abs2(r[i] * cgp))) / r[i]
         end
@@ -288,7 +289,7 @@ cone_ts = [
     ]
 
 function printx(x::Float64)
-    if x < 10
+    if abs(x) < 10
         return @sprintf("%.1f", x)
     else
         return @sprintf("%.0f.", x)
@@ -312,6 +313,7 @@ function get_resids()
             )
 
         for C in cone_ts, o in offsets, i in 1:num_samples
+            Random.seed!(i)
             cone = C(d)
             z = dual_point(cone, o)
             (g, iter) = dual_grad(cone, z)
@@ -337,16 +339,12 @@ function get_resids()
 
         for subdf in groupby(agg, [:cone_d, :offset])
             for r in eachrow(subdf)
-                print(reio, sep * printx(log10(abs(r.residdirectmean))) * sep *
-                    printx(log10(abs(r.residnaivemean))))
-            end
-            print(reio, "\\\\ \n")
-        end
-        for subdf in groupby(agg, [:cone_d, :offset])
-            for r in eachrow(subdf)
-                print(itio, sep * sep * printx(r.newtonitersmean) *
+                print(reio, sep * printx(log10(abs(r.residnaivemean))) * sep *
+                    printx(log10(abs(r.residdirectmean))))
+                print(itio, sep * printx(r.newtonitersmean) *
                     sep * printx(r.directitersmean))
             end
+            print(reio, "\\\\ \n")
             print(itio, "\\\\ \n")
         end
 
