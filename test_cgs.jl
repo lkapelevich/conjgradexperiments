@@ -317,13 +317,14 @@ function get_resids()
             cone = C(d)
             z = dual_point(cone, o)
             (g, iter) = dual_grad(cone, z)
-            resid = dot(z, g) + length(z)
+            resid = abs(dot(z, g) + length(z)) # if -g slightly out of primal cone then can be numerically negative
             # @show resid
             (naive_g, naive_iter, resid_path) = naive_dual_grad(cone, z)
             naive_resid = abs(dot(z, naive_g) + length(z))
             push!(results, (d, nameof(C), o, i, resid,
                 naive_resid, naive_iter, iter))
-            if i == 1
+            if i == 1 && d == 60
+                @show nameof(C), resid
                 resid_df = DataFrame(resid = resid_path)
                 resids_name = lowercase(string(nameof(C))) * string(Int(-log10(o)))
                 CSV.write(joinpath("csvs", resids_name * ".csv"), resid_df)

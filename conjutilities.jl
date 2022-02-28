@@ -25,7 +25,7 @@ function wrightomega(z::T) where {T <: Real}
         t = w1 * (w1 + T(2) / 3 * r)
         w *= 1 + r / w1 * (t - r / 2) / (t - r)
         fscn = abs(r^4 * (2 * w * (w - 4) - 1))
-        if t < eps(float(T)) * 72 * w1^6
+        if fscn < eps(float(T)) * 72 * w1^6
             break
         end
     end
