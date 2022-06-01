@@ -35,16 +35,17 @@ end
 function rootnewton(
     f::Function,
     g::Function;
-    lower::T = -Inf,
-    upper::T = Inf,
-    init::T = (lower + upper) / 2,
+    lower::Float64 = -Inf,
+    upper::Float64 = Inf,
+    init::Float64 = (lower + upper) / 2,
     increasing::Bool = true,
-    ) where {T <: Real}
+    )
     curr = init
     f_new = f(curr)
     iter = 0
+    candidate = zero(Double64)
     while abs(f_new) > 1000eps()
-        candidate = curr - f_new / g(BigFloat(curr))
+        candidate = curr - f_new / g(Double64(curr))
         if (candidate < lower) || (candidate > upper)
             curr = (lower + upper) / 2
         else
@@ -63,5 +64,5 @@ function rootnewton(
         end
     end
     # @show iter
-    return (T(curr), iter)
+    return (Float64(curr), iter)
 end

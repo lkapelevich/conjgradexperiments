@@ -6,6 +6,7 @@ using DataFrames
 using CSV
 using Statistics
 using Printf
+using DoubleFloats
 include("conjutilities.jl")
 # include("grad_hess.jl")
 Random.seed!(1)
@@ -191,6 +192,10 @@ function dual_grad(cone::RadialPower, pr)
             log_phi_r - log(2 * y / p + y^2) - 2 * log(2 * y / p)
         hp(y) = 2 * sum(αi^2 / (αi * y + (1 + αi) / p) for αi in α) -
             2 * (y + 1 / p) / y / (y + 2 / p)
+        # For this cone we start at a different point to "inner_bound" (which
+        # guarantees quadratic convergence) because "outer_bound" gives fewer
+        # iterations in practice. With `rootnewton` we never step outside of
+        # (inner_bound, outer_bound).
         (cgp, iter) = rootnewton(h, hp, lower = inner_bound, upper = outer_bound,
             init = outer_bound, increasing = false)
         cgr = -(α * (1 + p * cgp) .+ 1) ./ r
@@ -350,6 +355,7 @@ function get_resids()
         end
 
         CSV.write("csvs/cgs_$(d).csv", agg)
+        # CSV.write("csvs/rawcgs_$(d).csv", results)
     end
     close(reio)
     close(itio)
