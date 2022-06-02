@@ -240,7 +240,7 @@ end
 function naive_dual_grad(cone, z)
     curr = init_guess(cone)
     derivs = grad_hess(cone, curr)
-    quad_bound = 0.35
+    quad_bound = (3 - sqrt(5)) / 2
     (g, H) = (DiffResults.gradient(derivs), DiffResults.hessian(derivs))
     H_fact = cholesky(Symmetric(H))
     r = z + g
